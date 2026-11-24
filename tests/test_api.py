@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from src.api.main import create_app
 from src.config import ROOT, Settings
+from src.rag.pipeline import _embeddings, build_llm_client
 from tests.conftest import RecordingLlm, StubRagIndex
 
 TECHNICAL = "O DHCP do roteador nao entrega IP e o Wi-Fi cai. Preciso reconfigurar."
@@ -180,6 +181,86 @@ def test_missing_manual_logs_without_secret(tmp_path, monkeypatch, caplog) -> No
     assert health.json()["rag_ready"] is False
     joined = " ".join(record.getMessage() for record in caplog.records)
     assert "rag_index_unavailable" in joined
+    assert "secret-value-should-not-log" not in joined
+
+
+def test_gemini_model_defaults_and_env_override(monkeypatch) -> None:
+    monkeypatch.delenv("GEMINI_CHAT_MODEL", raising=False)
+    monkeypatch.delenv("GEMINI_EMBEDDING_MODEL", raising=False)
+    defaults = Settings(_env_file=None)
+    assert defaults.gemini_chat_model == "gemini-2.5-flash-lite"
+    assert defaults.gemini_embedding_model == "gemini-embedding-001"
+
+    monkeypatch.setenv("GEMINI_CHAT_MODEL", "custom-chat")
+    monkeypatch.setenv("GEMINI_EMBEDDING_MODEL", "custom-embed")
+    overridden = Settings(_env_file=None)
+    assert overridden.gemini_chat_model == "custom-chat"
+    assert overridden.gemini_embedding_model == "custom-embed"
+
+
+def test_gemini_clients_use_configured_model_ids(monkeypatch) -> None:
+    seen: list[tuple[str, dict]] = []
+
+    class FakeChat:
+        def __init__(self, **kwargs) -> None:
+            seen.append(("chat", kwargs))
+
+    class FakeEmbeddings:
+        def __init__(self, **kwargs) -> None:
+            seen.append(("embeddings", kwargs))
+
+    monkeypatch.setattr("langchain_google_genai.ChatGoogleGenerativeAI", FakeChat)
+    monkeypatch.setattr(
+        "langchain_google_genai.GoogleGenerativeAIEmbeddings",
+        FakeEmbeddings,
+    )
+
+    default = Settings(_env_file=None, llm_provider="gemini", gemini_api_key="k")
+    build_llm_client(default)
+    _embeddings(default)
+
+    custom = Settings(
+        _env_file=None,
+        llm_provider="gemini",
+        gemini_api_key="k",
+        gemini_chat_model="custom-chat",
+        gemini_embedding_model="custom-embed",
+    )
+    build_llm_client(custom)
+    _embeddings(custom)
+
+    assert seen == [
+        ("chat", {"model": "gemini-2.5-flash-lite", "api_key": "k", "temperature": 0}),
+        ("embeddings", {"model": "gemini-embedding-001", "google_api_key": "k"}),
+        ("chat", {"model": "custom-chat", "api_key": "k", "temperature": 0}),
+        ("embeddings", {"model": "custom-embed", "google_api_key": "k"}),
+    ]
+
+
+def test_embedding_api_failure_keeps_predict(tmp_path, monkeypatch, caplog) -> None:
+    monkeypatch.setattr(
+        "src.api.main.get_settings",
+        lambda: Settings(
+            model_path=ROOT / "models" / "ticket_classifier.joblib",
+            manual_path=tmp_path / "manual.pdf",
+            gemini_api_key="secret-value-should-not-log",
+        ),
+    )
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("secret-value-should-not-log")
+
+    monkeypatch.setattr("src.api.main.load_rag_index", boom)
+    caplog.set_level("WARNING", logger="support_copilot")
+    app = create_app()
+    with TestClient(app) as local_client:
+        health = local_client.get("/health")
+        predict = local_client.post("/predict", json={"text": TECHNICAL})
+    assert health.json()["rag_ready"] is False
+    assert predict.status_code == 200
+    joined = " ".join(record.getMessage() for record in caplog.records)
+    assert "rag_index_unavailable" in joined
+    assert "RuntimeError" in joined
     assert "secret-value-should-not-log" not in joined
 
 

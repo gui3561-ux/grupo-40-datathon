@@ -60,7 +60,10 @@ def _embeddings(settings: Settings):
         return OpenAIEmbeddings(api_key=key)
     from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-    return GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=key)
+    return GoogleGenerativeAIEmbeddings(
+        model=settings.gemini_embedding_model,
+        google_api_key=key,
+    )
 
 
 def load_rag_index(manual_path: Path | None = None, settings: Settings | None = None) -> RagIndex:
@@ -74,10 +77,14 @@ def load_rag_index(manual_path: Path | None = None, settings: Settings | None = 
 
 
 class GeminiClient:
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, settings: Settings) -> None:
         from langchain_google_genai import ChatGoogleGenerativeAI
 
-        self._model = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=api_key, temperature=0)
+        self._model = ChatGoogleGenerativeAI(
+            model=settings.gemini_chat_model,
+            api_key=api_key,
+            temperature=0,
+        )
 
     def invoke(self, prompt: str) -> str:
         return str(self._model.invoke(prompt).content)
@@ -100,4 +107,4 @@ def build_llm_client(settings: Settings | None = None) -> LlmClient | None:
         return None
     if cfg.llm_provider == "openai":
         return OpenAiClient(key)
-    return GeminiClient(key)
+    return GeminiClient(key, cfg)
