@@ -41,6 +41,35 @@ def build_prompt(question: str, chunks: list[str]) -> str:
     return f"{SYSTEM_PROMPT}\n\nManual:\n{context}\n\nPergunta:\n{question}"
 
 
+def message_text(message: object) -> str:
+    """Texto plano da resposta. Gemini 3 devolve partes com assinatura; só o texto sai."""
+    direct = getattr(message, "text", None)
+    if isinstance(direct, str) and direct:
+        return direct
+    return _content_text(getattr(message, "content", message))
+
+
+def _content_text(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for item in content:
+        if isinstance(item, str):
+            parts.append(item)
+            continue
+        if isinstance(item, dict):
+            kind = item.get("type", "text")
+            value = item.get("text")
+        else:
+            kind = getattr(item, "type", "text")
+            value = getattr(item, "text", None)
+        if kind == "text" and isinstance(value, str):
+            parts.append(value)
+    return "".join(parts)
+
+
 def answer_from_context(question: str, chunks: list[str], llm: LlmClient | None) -> str:
     cleaned = [chunk.strip() for chunk in chunks if chunk.strip()]
     if not cleaned:
@@ -87,7 +116,7 @@ class GeminiClient:
         )
 
     def invoke(self, prompt: str) -> str:
-        return str(self._model.invoke(prompt).content)
+        return message_text(self._model.invoke(prompt))
 
 
 class OpenAiClient:
@@ -97,7 +126,7 @@ class OpenAiClient:
         self._model = ChatOpenAI(model="gpt-4o-mini", api_key=api_key, temperature=0)
 
     def invoke(self, prompt: str) -> str:
-        return str(self._model.invoke(prompt).content)
+        return message_text(self._model.invoke(prompt))
 
 
 def build_llm_client(settings: Settings | None = None) -> LlmClient | None:

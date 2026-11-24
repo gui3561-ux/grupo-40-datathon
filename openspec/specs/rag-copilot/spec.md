@@ -7,11 +7,11 @@ Responde dúvidas técnicas de suporte apenas com o conteúdo de um manual em PD
 ## Requirements
 
 ### Requirement: Chat RAG restrito a chamado técnico
-A API SHALL expor `POST /chat` com o texto da pergunta. O sistema MUST classificar o texto com o modelo de triagem e, somente se a categoria for técnica e o índice do manual estiver carregado, recuperar trechos do manual PDF e gerar a resposta com um LLM. Se a categoria não for técnica, o sistema MUST NÃO chamar o LLM e MUST devolver um roteamento explícito. Se a categoria for técnica, a chave do LLM estiver configurada e o índice do manual não estiver carregado, a API MUST responder 503 e MUST NÃO devolver sucesso com RAG aplicado.
+A API SHALL expor `POST /chat` com o texto da pergunta. O sistema MUST classificar o texto com o modelo de triagem e, somente se a categoria for técnica e o índice do manual estiver carregado, recuperar trechos do manual PDF e gerar a resposta com um LLM. Se a categoria não for técnica, o sistema MUST NÃO chamar o LLM e MUST devolver um roteamento explícito. Se a categoria for técnica, a chave do LLM estiver configurada e o índice do manual não estiver carregado, a API MUST responder 503 e MUST NÃO devolver sucesso com RAG aplicado. Quando o RAG gera a resposta, o campo `answer` MUST ser somente o texto plano dessa resposta. Partes estruturadas, metadados e assinatura devolvidos pelo modelo MUST NÃO aparecer nesse campo.
 
 #### Scenario: Pergunta técnica usa o manual
 - **WHEN** o cliente envia `POST /chat` com uma dúvida coberta pelo manual (por exemplo configuração de um roteador) e o índice do manual está carregado
-- **THEN** a resposta é 200, indica que veio do RAG e contém solução fundamentada nos trechos recuperados do PDF
+- **THEN** a resposta é 200, indica que veio do RAG e o campo `answer` é texto plano com a solução fundamentada nos trechos recuperados do PDF
 
 #### Scenario: Pergunta não técnica não aciona o LLM
 - **WHEN** o cliente envia `POST /chat` com um chamado de cobrança ou conta
@@ -24,6 +24,10 @@ A API SHALL expor `POST /chat` com o texto da pergunta. O sistema MUST classific
 #### Scenario: Índice ausente não finge RAG
 - **WHEN** `POST /chat` é técnico e válido, a chave do LLM está configurada e o índice do manual não está carregado
 - **THEN** a API responde 503, não chama o LLM e não responde sucesso com RAG aplicado
+
+#### Scenario: Bloco do modelo não vaza no answer
+- **WHEN** o modelo de chat devolve a solução como uma parte de texto acompanhada de metadados ou assinatura
+- **THEN** o campo `answer` contém só a frase da solução e não contém a assinatura nem a estrutura da parte
 
 ### Requirement: Guardrails de prompt inseguro
 O sistema SHALL recusar, antes de qualquer chamada ao LLM, perguntas que contenham palavras proibidas ou que tentem fazer a IA ignorar o manual, o PDF ou as instruções (jailbreak), inclusive paráfrases em português ou inglês que não usem a frase exata já coberta. A recusa MUST ser explícita e MUST NÃO devolver conteúdo gerado pelo modelo.
@@ -86,11 +90,11 @@ Cada request atendida em `POST /predict` e `POST /chat` SHALL gerar uma linha de
 - **THEN** o log dessa request inclui um valor de latência e não contém o e-mail nem o restante do texto do chamado
 
 ### Requirement: Modelos Gemini configuráveis
-Quando o provedor de LLM configurado é Gemini, o sistema MUST usar o modelo de chat `gemini-2.5-flash-lite` e o modelo de embedding `gemini-embedding-001`, salvo quando a configuração de ambiente informar outros identificadores. A chave do provedor MUST permanecer só no ambiente e MUST NÃO entrar em log.
+Quando o provedor de LLM configurado é Gemini, o sistema MUST usar o modelo de chat `gemini-3.1-flash-lite` e o modelo de embedding `gemini-embedding-001`, salvo quando a configuração de ambiente informar outros identificadores. O padrão de chat MUST NÃO ser `gemini-2.5-flash-lite`, porque uma chave nova recebe 404 nesse identificador. A chave do provedor MUST permanecer só no ambiente e MUST NÃO entrar em log.
 
-#### Scenario: Padrão usa os identificadores mais baratos
+#### Scenario: Padrão usa o chat mais barato ainda chamável
 - **WHEN** o provedor é Gemini e a configuração não informa identificadores de modelo
-- **THEN** a chamada de chat usa `gemini-2.5-flash-lite` e a construção do índice usa `gemini-embedding-001`
+- **THEN** a chamada de chat usa `gemini-3.1-flash-lite` e a construção do índice usa `gemini-embedding-001`
 
 #### Scenario: Ambiente troca o identificador
 - **WHEN** a configuração informa outro identificador de chat ou de embedding

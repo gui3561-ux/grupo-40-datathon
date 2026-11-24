@@ -188,7 +188,7 @@ def test_gemini_model_defaults_and_env_override(monkeypatch) -> None:
     monkeypatch.delenv("GEMINI_CHAT_MODEL", raising=False)
     monkeypatch.delenv("GEMINI_EMBEDDING_MODEL", raising=False)
     defaults = Settings(_env_file=None)
-    assert defaults.gemini_chat_model == "gemini-2.5-flash-lite"
+    assert defaults.gemini_chat_model == "gemini-3.1-flash-lite"
     assert defaults.gemini_embedding_model == "gemini-embedding-001"
 
     monkeypatch.setenv("GEMINI_CHAT_MODEL", "custom-chat")
@@ -230,7 +230,7 @@ def test_gemini_clients_use_configured_model_ids(monkeypatch) -> None:
     _embeddings(custom)
 
     assert seen == [
-        ("chat", {"model": "gemini-2.5-flash-lite", "api_key": "k", "temperature": 0}),
+        ("chat", {"model": "gemini-3.1-flash-lite", "api_key": "k", "temperature": 0}),
         ("embeddings", {"model": "gemini-embedding-001", "google_api_key": "k"}),
         ("chat", {"model": "custom-chat", "api_key": "k", "temperature": 0}),
         ("embeddings", {"model": "custom-embed", "google_api_key": "k"}),

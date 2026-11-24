@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     mlflow_experiment: str = "support-copilot-triage"
     llm_provider: str = "gemini"
     gemini_api_key: str | None = None
-    gemini_chat_model: str = "gemini-2.5-flash-lite"
+    gemini_chat_model: str = "gemini-3.1-flash-lite"
     gemini_embedding_model: str = "gemini-embedding-001"
     openai_api_key: str | None = None
     log_level: str = "INFO"
