@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import create_app
-from src.config import ROOT
+from src.config import ROOT, Settings
 from src.ml.prepare_data import write_tickets_csv
 from src.ml.train import train
 from src.ml.write_manual import write_manual_pdf
@@ -20,8 +20,17 @@ def artifacts() -> None:
 
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
+    monkeypatch.setattr(
+        "src.api.main.get_settings",
+        lambda: Settings(gemini_api_key="", openai_api_key=""),
+    )
     return create_app()
+
+
+class StubRagIndex:
+    def retrieve(self, query: str, k: int = 4) -> list[str]:
+        return ["O DHCP entrega enderecos de 192.168.1.100 a 192.168.1.200."]
 
 
 @pytest.fixture

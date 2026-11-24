@@ -28,6 +28,7 @@ class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     rag_ready: bool
+    llm_configured: bool
 
 
 class ChatResponse(BaseModel):

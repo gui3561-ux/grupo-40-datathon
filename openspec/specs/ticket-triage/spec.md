@@ -7,7 +7,7 @@ Classifica o assunto de um chamado de suporte com modelo clássico, registra Acc
 ## Requirements
 
 ### Requirement: Treino de classificador clássico de tickets
-O sistema SHALL treinar um modelo clássico de classificação de texto sobre um dataset público de chamados de suporte que inclua ao menos a categoria técnica, persistir o artefato treinado e avaliar Accuracy e F1 macro em holdout estratificado.
+O sistema SHALL treinar um modelo clássico de classificação de texto sobre o arquivo de tickets versionado no repositório, persistir o artefato treinado e avaliar Accuracy e F1 macro em holdout estratificado. Esse arquivo SHALL trazer as categorias `technical`, `billing`, `account` e `other`, com texto de no máximo 1000 caracteres, gerado por moldes do próprio repositório. O README MUST declarar que o arquivo não é um dump público de chamados e que Accuracy e F1 descrevem o holdout desses moldes.
 
 #### Scenario: Treino produz artefato e métricas
 - **WHEN** o script de treino é executado sobre o dataset de tickets versionado no repositório
@@ -17,6 +17,10 @@ O sistema SHALL treinar um modelo clássico de classificação de texto sobre um
 - **WHEN** o modelo treinado recebe um chamado cujo assunto é um problema técnico de equipamento de rede
 - **THEN** a categoria prevista é a fila técnica usada para acionar o Copilot RAG
 
+#### Scenario: README explica os moldes
+- **WHEN** um avaliador lê a seção de dados ou de setup do README
+- **THEN** encontra que o CSV é gerado no repositório por 10 moldes por classe e que Accuracy e F1 medem o holdout desse conjunto, não uma fila real de suporte
+
 ### Requirement: Registro de experimentos no MLflow
 O treino SHALL registrar em um servidor MLflow local o nome do experimento, os parâmetros relevantes, a Accuracy e o F1 macro, de modo que as runs sejam visíveis na UI do MLflow.
 
@@ -25,7 +29,7 @@ O treino SHALL registrar em um servidor MLflow local o nome do experimento, os p
 - **THEN** existe ao menos uma run no experimento do Copilot contendo as métricas `accuracy` e `f1_macro`
 
 ### Requirement: Inferência HTTP da categoria
-A API SHALL expor `POST /predict` recebendo o texto do chamado e devolvendo a categoria prevista, a confiança e o identificador do modelo. A API SHALL expor `GET /health` indicando se o artefato de modelo está carregado.
+A API SHALL expor `POST /predict` recebendo o texto do chamado e devolvendo a categoria prevista, a confiança e o identificador do modelo. A API SHALL expor `GET /health` indicando se o artefato de modelo está carregado e se uma chave de LLM está configurada. O corpo de `/health` MUST NÃO incluir o valor da chave.
 
 #### Scenario: Predição bem-sucedida
 - **WHEN** um cliente envia `POST /predict` com um texto de chamado válido
@@ -34,3 +38,11 @@ A API SHALL expor `POST /predict` recebendo o texto do chamado e devolvendo a ca
 #### Scenario: Serviço degradado sem modelo
 - **WHEN** a API inicia sem o artefato de modelo
 - **THEN** `GET /health` reporta que o modelo não está carregado e `POST /predict` responde 503
+
+#### Scenario: Health indica chave sem revelá-la
+- **WHEN** o cliente chama `GET /health` com uma chave de LLM configurada no ambiente
+- **THEN** a resposta indica que a chave está configurada e o corpo não contém o valor dessa chave
+
+#### Scenario: Health sem chave de LLM
+- **WHEN** o cliente chama `GET /health` sem chave de LLM no ambiente
+- **THEN** a resposta indica que a chave não está configurada

@@ -6,7 +6,6 @@ from typing import Protocol
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain_core.embeddings import FakeEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from src.config import Settings, get_settings
@@ -22,6 +21,10 @@ SYSTEM_PROMPT = (
 
 class LlmClient(Protocol):
     def invoke(self, prompt: str) -> str: ...
+
+
+class RagUnavailable(Exception):
+    """O índice não foi construído com os embeddings do provedor configurado."""
 
 
 @dataclass
@@ -49,15 +52,15 @@ def answer_from_context(question: str, chunks: list[str], llm: LlmClient | None)
 
 def _embeddings(settings: Settings):
     key = settings.llm_api_key
-    if settings.llm_provider == "openai" and key:
+    if not key:
+        raise RagUnavailable("embedding_key_missing")
+    if settings.llm_provider == "openai":
         from langchain_openai import OpenAIEmbeddings
 
         return OpenAIEmbeddings(api_key=key)
-    if settings.llm_provider == "gemini" and key:
-        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-        return GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=key)
-    return FakeEmbeddings(size=64)
+    return GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=key)
 
 
 def load_rag_index(manual_path: Path | None = None, settings: Settings | None = None) -> RagIndex:

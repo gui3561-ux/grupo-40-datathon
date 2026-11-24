@@ -1,0 +1,35 @@
+## MODIFIED Requirements
+
+### Requirement: Treino de classificador clássico de tickets
+O sistema SHALL treinar um modelo clássico de classificação de texto sobre o arquivo de tickets versionado no repositório, persistir o artefato treinado e avaliar Accuracy e F1 macro em holdout estratificado. Esse arquivo SHALL trazer as categorias `technical`, `billing`, `account` e `other`, com texto de no máximo 1000 caracteres, gerado por moldes do próprio repositório. O README MUST declarar que o arquivo não é um dump público de chamados e que Accuracy e F1 descrevem o holdout desses moldes.
+
+#### Scenario: Treino produz artefato e métricas
+- **WHEN** o script de treino é executado sobre o dataset de tickets versionado no repositório
+- **THEN** o sistema grava um artefato de modelo carregável e reporta Accuracy e F1 macro do conjunto de teste
+
+#### Scenario: Categorias incluem fila técnica
+- **WHEN** o modelo treinado recebe um chamado cujo assunto é um problema técnico de equipamento de rede
+- **THEN** a categoria prevista é a fila técnica usada para acionar o Copilot RAG
+
+#### Scenario: README explica os moldes
+- **WHEN** um avaliador lê a seção de dados ou de setup do README
+- **THEN** encontra que o CSV é gerado no repositório por 10 moldes por classe e que Accuracy e F1 medem o holdout desse conjunto, não uma fila real de suporte
+
+### Requirement: Inferência HTTP da categoria
+A API SHALL expor `POST /predict` recebendo o texto do chamado e devolvendo a categoria prevista, a confiança e o identificador do modelo. A API SHALL expor `GET /health` indicando se o artefato de modelo está carregado e se uma chave de LLM está configurada. O corpo de `/health` MUST NÃO incluir o valor da chave.
+
+#### Scenario: Predição bem-sucedida
+- **WHEN** um cliente envia `POST /predict` com um texto de chamado válido
+- **THEN** a resposta é 200 com categoria, confiança numérica e identificador do modelo
+
+#### Scenario: Serviço degradado sem modelo
+- **WHEN** a API inicia sem o artefato de modelo
+- **THEN** `GET /health` reporta que o modelo não está carregado e `POST /predict` responde 503
+
+#### Scenario: Health indica chave sem revelá-la
+- **WHEN** o cliente chama `GET /health` com uma chave de LLM configurada no ambiente
+- **THEN** a resposta indica que a chave está configurada e o corpo não contém o valor dessa chave
+
+#### Scenario: Health sem chave de LLM
+- **WHEN** o cliente chama `GET /health` sem chave de LLM no ambiente
+- **THEN** a resposta indica que a chave não está configurada

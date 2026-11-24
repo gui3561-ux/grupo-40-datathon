@@ -22,6 +22,8 @@ uv run python -m src.ml.train
 uv run python -m src.drift.report
 ```
 
+`data/processed/tickets.csv` sai de `src/ml/prepare_data.py`: 10 moldes por classe (`technical`, `billing`, `account`, `other`), 300 linhas cada, com só o número do exemplo mudando. Não há dump público de chamados nesse arquivo. As métricas `accuracy` e `f1_macro` medem o holdout desses moldes. Elas não descrevem uma fila real de suporte.
+
 ## API
 
 ```bash
@@ -95,7 +97,7 @@ docker run --rm -p 8000:8000 -e GEMINI_API_KEY="$GEMINI_API_KEY" support-copilot
 1. Build da imagem e push no Artifact Registry.
 2. Cloud Run serve o container (CPU, sem GPU), HTTPS gerenciado, autoscaling de 0 a N instâncias conforme concorrência dos chamados.
 3. A chave do LLM fica no Secret Manager e é injetada como variável de ambiente — nunca no Git nem na imagem.
-4. Logs estruturados (categoria, bloqueio, latência, **sem** corpo do chamado) vão para o Cloud Logging.
+4. Logs estruturados (categoria, bloqueio, motivo, tamanho do texto e latência, **sem** corpo do chamado) vão para o Cloud Logging.
 
 Isso escala o Copilot sem reescrever a API: o contrato HTTP permanece o mesmo.
 
@@ -105,7 +107,7 @@ O tratamento de chamados de suporte se apoia na **execução de contrato** (Art.
 
 PII tratada no texto do chamado: **CPF**, **e-mail**, **telefone**. Antes de qualquer envio ao subprocessador (Gemini/OpenAI, frequentemente fora do Brasil), a API substitui esses valores por `[CPF]`, `[EMAIL]` e `[PHONE]`. Guardrails bloqueiam prompts inseguros **antes** da retrieval e do LLM.
 
-Chaves (`GEMINI_API_KEY`, `OPENAI_API_KEY`) e arquivos `.env` não são versionados. Logs não gravam o corpo bruto do chamado. Retenção: o texto vive só na memória da requisição; não há banco de tickets. O titular pode solicitar revisão de decisão automatizada (Art. 20) — a triagem clássica é um apoio ao atendimento, não uma decisão definitiva de recusa de serviço.
+Chaves (`GEMINI_API_KEY`, `OPENAI_API_KEY`) e arquivos `.env` não são versionados. Cada request de `/predict` e `/chat` grava no log a categoria, o bloqueio, o motivo, o tamanho do texto e a latência. O corpo do chamado não entra nessa linha. Retenção: o texto vive só na memória da requisição; não há banco de tickets. O titular pode solicitar revisão de decisão automatizada (Art. 20) — a triagem clássica é um apoio ao atendimento, não uma decisão definitiva de recusa de serviço.
 
 ## Roteiro STAR do vídeo (5 min)
 

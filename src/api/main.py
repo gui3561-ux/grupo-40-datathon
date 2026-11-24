@@ -7,9 +7,9 @@ from fastapi import FastAPI
 
 from src.api.routes import router
 from src.config import get_settings
-from src.logutil import configure_logging
+from src.logutil import configure_logging, logger
 from src.ml.predict import load_classifier
-from src.rag.pipeline import build_llm_client, load_rag_index
+from src.rag.pipeline import RagUnavailable, build_llm_client, load_rag_index
 
 
 @asynccontextmanager
@@ -23,8 +23,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.classifier = None
     try:
         app.state.rag_index = load_rag_index(settings=settings)
-    except (FileNotFoundError, OSError, ValueError):
+    except (FileNotFoundError, OSError, ValueError, RagUnavailable) as exc:
         app.state.rag_index = None
+        logger.warning(
+            "rag_index_unavailable error=%s path=%s",
+            type(exc).__name__,
+            settings.manual_path,
+        )
     app.state.llm = build_llm_client(settings)
     yield
     app.state.classifier = None
